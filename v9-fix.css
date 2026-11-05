@@ -1,0 +1,16 @@
+/* V9: project-specific offline screenshots, not stock photos */
+.service-photo,.feature-photo img,.showcase-real-photo img {filter:saturate(1.05) contrast(1.02)!important;}
+.service-image-shade {background:linear-gradient(180deg,rgba(7,11,30,.55) 0%,transparent 30%,rgba(7,11,30,.20) 100%)!important;}
+.feature-photo img{object-position:50% 38%!important;}
+.photo-tint{background:linear-gradient(180deg,transparent 68%,rgba(2,5,18,.5) 100%)!important;}
+.service-photo{object-fit:cover;background:#101627;}
+.service-overline,.service-count{text-shadow:0 2px 9px rgba(0,0,0,.82)!important;}
+.drawer-photo{object-fit:cover;}
+/* Native select list on Windows: correct colors even if whole site uses dark theme. */
+.modal-card form select,.modal-card form select option,#orderService,#orderService option{color:#19213c!important;background-color:#fff!important;color-scheme:light!important;}
+.modal-card form select,#orderService{height:50px;line-height:1.25;border:1px solid #ccd7da!important;box-shadow:none!important;}
+.modal-card form select:focus,#orderService:focus{border-color:#7d66d8!important;box-shadow:0 0 0 3px #8065d933!important;}
+.modal-card form select option{font-weight:600!important;padding:7px!important;}
+/* reduced over-darkening of mockup images on hover */
+.service-card:hover .service-photo{transform:scale(1.035);}
+@media (max-width:460px){.service-photo{object-position:center top}.service-visual.photo-service{height:200px}}
