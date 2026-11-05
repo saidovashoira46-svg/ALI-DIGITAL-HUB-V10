@@ -11,7 +11,7 @@ const catalog=JSON.parse(await fs.readFile(path.join(root,'catalog.json'),'utf8'
 const byId=new Map(catalog.map(item=>[item.id,item]));
 const PORT=Number(process.env.PORT||3000);
 const supabaseUrl=(process.env.SUPABASE_URL||'').replace(/\/$/,'');
-const supabaseKey=process.env.SUPABASE_SERVICE_ROLE_KEY||'';
+const supabaseKey=process.env.SUPABASE_SERVICE_ROLE_KEY||process.env.SUPABASE_SECRET_KEY||'';
 const telegramToken=process.env.TELEGRAM_BOT_TOKEN||'';
 const telegramChatId=process.env.TELEGRAM_CHAT_ID||'';
 // Mahalliy avtomatik testlar uchun soxta Telegram API; productionda faqat rasmiy API.
@@ -32,10 +32,22 @@ async function body(req){const max=7000;let size=0;const chunks=[];for await(con
 function validStr(x,min,max){return typeof x==='string'&&x.trim().length>=min&&x.trim().length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(x);}
 async function readLocal(){try{return JSON.parse(await fs.readFile(dataFile,'utf8'));}catch(e){if(e.code==='ENOENT')return{orders:[],partners:[],inquiries:[]};throw e;}}
 async function saveLocal(collection,item){const work=writeQueue.then(async()=>{const db=await readLocal();(db[collection]??=[]).push(item);await fs.mkdir(path.dirname(dataFile),{recursive:true});const tmp=dataFile+'.'+randomUUID()+'.tmp';await fs.writeFile(tmp,JSON.stringify(db,null,2),'utf8');await fs.rename(tmp,dataFile);});writeQueue=work.catch(()=>{});await work;}
-function sbHeaders(){return{'apikey':supabaseKey,'Authorization':'Bearer '+supabaseKey,'Content-Type':'application/json','Prefer':'return=representation'};}
+function sbHeaders(){
+ // New sb_secret_ keys are API keys, not JWTs; use apikey only.
+ // Older service_role JWTs still require a matching Authorization header.
+ const headers={'apikey':supabaseKey,'Content-Type':'application/json','Prefer':'return=representation'};
+ if(!supabaseKey.startsWith('sb_secret_'))headers.Authorization='Bearer '+supabaseKey;
+ return headers;
+}
 async function supabaseQuery(table,method,payload,query=''){
  const controller=new AbortController();const tm=setTimeout(()=>controller.abort(),8500);
- try{const response=await fetch(`${supabaseUrl}/rest/v1/${table}${query}`,{method,headers:sbHeaders(),body:payload===undefined?undefined:JSON.stringify(payload),signal:controller.signal});const text=await response.text();if(!response.ok)throw Error(`Database HTTP ${response.status}: ${text.slice(0,150)}`);return text?JSON.parse(text):[];}finally{clearTimeout(tm);}
+ try{const response=await fetch(`${supabaseUrl}/rest/v1/${table}${query}`,{method,headers:sbHeaders(),body:payload===undefined?undefined:JSON.stringify(payload),signal:controller.signal});const text=await response.text();if(!response.ok){
+   let code='unknown';
+   try{const parsed=JSON.parse(text);code=String(parsed.code||parsed.error_code||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,50);}catch{}
+   // Do not print the body: it may contain project-specific or user-submitted data.
+   throw Error(`Supabase HTTP ${response.status}, code=${code}, operation=${method} ${table}`);
+  }
+  return text?JSON.parse(text):[];}finally{clearTimeout(tm);}
 }
 function telegramText(item,kind){
  const service=byId.get(item.service_id);
@@ -88,7 +100,16 @@ async function createRequest(req,res,kind){
    // Bazaga yozilgan, ammo Telegram ishlamasa, buni mijozga ochiq bildiramiz.
    if(isProduction&&!telegramSent)return send(res,202,{ok:true,id:item.id,storage,telegramSent:false,warning:'So‘rov bazaga saqlandi, lekin Telegramga yetib bormadi. Iltimos, Telegramdan ham yozing.'});
    send(res,201,{ok:true,id:item.id,storage,telegramSent});
- }catch(e){console.error('So‘rovni saqlash xatosi:',e.message);send(res,503,{error:'So‘rovni saqlash vaqtincha ishlamayapti. Telegramdan yozing.'});}
+ }catch(e){
+   console.error('So‘rovni saqlash xatosi:',e.message);
+   // If the persistent DB is unreachable, preserve the request in the owner's
+   // Telegram chat instead of silently losing it; never pretend it was saved in DB.
+   if(useSupabase&&useTelegram){
+    try{telegramSent=await sendTelegram(item,kind);}catch{}
+    if(telegramSent)return send(res,202,{ok:true,id:item.id,storage:'telegram-only',telegramSent:true,warning:'Buyurtma Telegram botga yetkazildi, ammo Supabase bazasiga saqlanmadi. Admin bazani tekshirishi kerak.'});
+   }
+   send(res,503,{error:'So‘rov bazaga saqlanmadi va Telegramga yetkazilgani tasdiqlanmadi. Telegramdan yozing.'});
+  }
 }
 function authorized(req){if(!adminKey)return false;const provided=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');const a=Buffer.from(provided),b=Buffer.from(adminKey);return a.length===b.length&&timingSafeEqual(a,b);}
 async function getAdmin(req,res,kind){if(!authorized(req))return send(res,401,{error:'Admin paroli noto‘g‘ri.'});try{if(useSupabase){const rows=await supabaseQuery(kind,'GET',undefined,'?select=*&order=created_at.desc&limit=200');return send(res,200,{items:rows});}if(isProduction)return send(res,503,{error:'Buyurtmalar ro‘yxati uchun Supabase talab qilinadi.'});const db=await readLocal();send(res,200,{items:(db[kind]||[]).slice().reverse()});}catch(e){console.error('Admin list xato:',e.message);send(res,503,{error:'Bazaga ulanib bo‘lmadi.'});}}

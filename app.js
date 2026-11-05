@@ -117,10 +117,11 @@ async function sendForm(form,kind){
     const endpoint=kind==='order'?'/api/orders':kind==='partner'?'/api/partners':'/api/inquiries';
     const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await response.json();if(!response.ok)throw Error(data.error||'Server bilan aloqa uzildi.');
-    let text=`So‘rovingiz qabul qilindi. №${data.id}. `;
-    if(data.telegramSent)text+='Xabar Telegramga yuborildi. Siz bilan bog‘lanishimizni kuting.';
-    else text+='Telegramga yetkazilgani tasdiqlanmadi. Iltimos, pastdagi tugma orqali o‘zingiz ham yuboring.';
-    showFeedback(feedback,text,false,data.telegramSent?'':shareText);
+    let text=`So‘rov №${data.id}. `;
+    if(data.warning) text+=data.warning;
+    else if(data.telegramSent)text+='Bazaga saqlandi va xabar Telegramga yuborildi. Siz bilan bog‘lanishimizni kuting.';
+    else text+='Bazaga saqlandi, ammo Telegramga yetkazilgani tasdiqlanmadi. Telegram orqali ham yozishingiz mumkin.';
+    showFeedback(feedback,text,Boolean(data.warning),data.telegramSent?'':shareText);
     form.reset();if(kind==='order'&&services.length)$('#orderService').value=services[0].id;
   }catch(error){showFeedback(feedback,`So‘rov serverga yuborilmadi: ${error.message} Quyidagi havola orqali Telegramdan yozing.`,true,shareText);}
   finally{submit.disabled=false;submit.textContent=label;}

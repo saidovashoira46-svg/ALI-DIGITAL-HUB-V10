@@ -1,0 +1,35 @@
+/* V11: Modal inputs MUST contrast with their light background, regardless of dark theme variables. */
+.modal-card form input:not([name="website"]),
+.modal-card form textarea,
+.modal-card form select,
+.modal-card form select option {
+  background-color: #ffffff !important;
+  color: #19233b !important;
+  -webkit-text-fill-color: #19233b !important;
+  caret-color: #19233b !important;
+  color-scheme: light !important;
+  border-color: #c6d0de !important;
+  font-weight: 600;
+}
+.modal-card form input:not([name="website"])::placeholder,
+.modal-card form textarea::placeholder {
+  color: #65728a !important;
+  -webkit-text-fill-color: #65728a !important;
+  opacity: 1 !important;
+  font-weight: 400;
+}
+.modal-card form input:-webkit-autofill,
+.modal-card form input:-webkit-autofill:hover,
+.modal-card form input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #19233b !important;
+  caret-color: #19233b !important;
+}
+.modal-card form label { color: #19233b !important; }
+.modal-card form input:not([name="website"]):focus-visible,
+.modal-card form textarea:focus-visible,
+.modal-card form select:focus-visible {
+  outline: 2px solid #7967ec;
+  outline-offset: 1px;
+  border-color: #7967ec !important;
+}
